@@ -108,6 +108,10 @@ footer a { color: var(--gold); }
 @media (max-width: 560px) {
   article { flex-direction: column; }
   h1 { font-size: 1.9rem; }
-  .hero { font-size: 2rem; }
+  .hero { font-size: 1.4rem; }
   .attrs { grid-template-columns: 1fr; }
+  #chainslot { font-size: 0.72rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toolbar { flex-direction: column; align-items: stretch; }
+  .views { gap: 1.4rem; }
+  .topbar { align-items: flex-start; flex-direction: column; }
 }
