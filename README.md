@@ -12,6 +12,9 @@ needed for lookups.
 - **Connect wallet** (Phantom/Solflare) → one click to inspect your own holdings
 - **Latest activity** feed — live chain data on load, newest assets first
 - Search/filter by name, mint, or creator; collection chips with counts
+- Connect with Nightly (required), Phantom, or Solflare; live balance + address badge
+- Send real SOL transfers on Cookie Chain with build → sign → broadcast → confirm feedback
+- Live chain slot indicator; fast IPFS gateway images with origin fallback
 - Click any asset for a full dossier: attributes, creators, royalty, files, provenance
 - Click a collection chip to drill into its members
 - Gallery mode, portfolio totals, shareable `#/owner/…` deep links, ⌘K quick jump
