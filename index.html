@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CookieScope — Cookie Chain explorer</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>🍪 CookieScope</h1>
+      <p>Wallet + asset explorer for <strong>Cookie Chain</strong>, powered by the public Cookiescan DAS API. No wallet or key needed for lookups.</p>
+      <form id="lookup">
+        <input id="addr" type="text" spellcheck="false" placeholder="Paste a Cookie Chain wallet address…" size="50" />
+        <button type="submit">Inspect</button>
+        <button type="button" id="sample">Load latest on-chain asset</button>
+      </form>
+      <p id="status"></p>
+      <section id="results"></section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

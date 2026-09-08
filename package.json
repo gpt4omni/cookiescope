@@ -1,0 +1,15 @@
+{
+  "name": "cookiescope",
+  "version": "0.1.0",
+  "description": "Wallet + asset explorer for Cookie Chain (DAS API). A Cookie Chain cApp.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  }
+}

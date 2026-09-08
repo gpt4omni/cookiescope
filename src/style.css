@@ -1,0 +1,8 @@
+body { font-family: system-ui, sans-serif; background: #14100b; color: #f5e9d4; margin: 0; }
+main { max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
+h1 { color: #f0b429; }
+input, button { font-size: 1rem; padding: 0.5rem; border-radius: 8px; border: 1px solid #6b5320; }
+input { width: 60%; background: #221a10; color: inherit; }
+button { background: #f0b429; color: #14100b; cursor: pointer; margin-left: 0.4rem; }
+article { display: flex; gap: 1rem; background: #221a10; border-radius: 12px; padding: 0.8rem; margin: 0.6rem 0; }
+code, small { color: #c9b48a; }
