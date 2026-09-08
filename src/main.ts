@@ -216,11 +216,13 @@ async function showMovers(): Promise<void> {
     limit: 100,
     options: { showCollectionMetadata: true },
   });
-  const movers = data.items
-    .filter((a) => (a.volume_24h ?? 0) > 0)
-    .sort((x, y) => (y.volume_24h ?? 0) - (x.volume_24h ?? 0))
-    .slice(0, 12);
-  setStatus(movers.length ? "Top movers by 24h volume:" : "No volume data yet — a young chain. Check back soon.");
+  const scored = (a: DasAsset): number =>
+    (a.volume_24h ?? 0) * 1e12 + (a.market_cap ?? 0) * 1e6 + (a.holder_count ?? 0);
+  const movers = [...data.items].sort((x, y) => scored(y) - scored(x)).slice(0, 12);
+  const hasVolume = movers.some((a) => (a.volume_24h ?? 0) > 0);
+  setStatus(hasVolume
+    ? "Top movers by 24h volume:"
+    : "Biggest assets by market cap & holders (volume ranking goes live once trading starts):");
   render(movers);
 }
 
