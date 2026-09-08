@@ -18,6 +18,7 @@
 }
 ::selection { background: var(--gold); color: #14100b; }
 * { box-sizing: border-box; }
+html, body { overflow-x: clip; }
 body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--cream); margin: 0; }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 main { max-width: 880px; margin: 0 auto; padding: 2.2rem 1.2rem 4rem; }
