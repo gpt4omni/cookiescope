@@ -8,9 +8,11 @@ needed for lookups.
 
 ## Features
 
-- Paste any Cookie Chain address → see all its assets (NFTs, fungibles, collections)
-- One-click "latest on-chain asset" demo — the app proves live chain data on load
-- Asset cards: name, symbol, mint, type, collection
+- Paste any Cookie Chain address → see all its assets with balances, prices, collections
+- **Connect wallet** (Phantom/Solflare) → one click to inspect your own holdings
+- **Latest activity** feed — live chain data on load, newest assets first
+- Search/filter by name, mint, or creator; collection chips with counts
+- Copy-mint buttons, verified-creator badges, responsive + keyboard-friendly
 
 ## Run it
 
