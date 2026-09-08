@@ -12,6 +12,10 @@ needed for lookups.
 - **Connect wallet** (Phantom/Solflare) → one click to inspect your own holdings
 - **Latest activity** feed — live chain data on load, newest assets first
 - Search/filter by name, mint, or creator; collection chips with counts
+- Click any asset for a full dossier: attributes, creators, royalty, files, provenance
+- Click a collection chip to drill into its members
+- Gallery mode, portfolio totals, shareable `#/owner/…` deep links, ⌘K quick jump
+- Market movers ranked by real 24h volume, 24h change badges, market caps, holder counts
 - Copy-mint buttons, verified-creator badges, responsive + keyboard-friendly
 
 ## Run it
