@@ -372,13 +372,22 @@ function txStatus(msg: string): void {
   (document.getElementById("txstatus") as HTMLElement).textContent = msg;
 }
 
-async function showSlot(): Promise<void> {
+async function showChainStats(): Promise<void> {
+  const el = document.getElementById("chainslot") as HTMLElement;
   try {
-    const slot = await connection.getSlot();
-    (document.getElementById("chainslot") as HTMLElement).textContent =
-      `Cookie Chain · slot ${slot.toLocaleString()} · live`;
+    const [slot, samples, fees] = await Promise.all([
+      connection.getSlot(),
+      connection.getRecentPerformanceSamples(2),
+      connection.getRecentPrioritizationFees(),
+    ]);
+    const txs = samples.reduce((n, s) => n + s.numTransactions, 0);
+    const secs = samples.reduce((n, s) => n + s.samplePeriodSecs, 0);
+    const tps = secs > 0 ? Math.round(txs / secs) : 0;
+    const sorted = fees.map((f) => f.prioritizationFee).sort((a, b) => a - b);
+    const median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
+    el.textContent = `slot ${slot.toLocaleString()} · ${tps} TPS · ${(median / 1e9).toFixed(9)} SOL fee`;
   } catch {
-    (document.getElementById("chainslot") as HTMLElement).textContent = "Cookie Chain · RPC unreachable";
+    el.textContent = "Cookie Chain · RPC unreachable";
   }
 }
 
@@ -411,7 +420,8 @@ const walletBalEl = document.getElementById("walletbal") as HTMLElement;
 
 armImageFallbacks(resultsEl);
 armImageFallbacks(modalEl);
-void showSlot();
+void showChainStats();
+window.setInterval(showChainStats, 30000);
 
 document.getElementById("lookup")!.addEventListener("submit", (e) => {
   e.preventDefault();
