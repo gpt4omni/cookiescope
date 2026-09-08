@@ -2,96 +2,29 @@ import "@fontsource/space-grotesk/700.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/600.css";
 import { Buffer } from "buffer";
-import { Connection, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import {
+  chainConnectionForWrites,
+  getAssetsByOwner,
+  getChainStats,
+  searchAssets,
+  type DasAsset,
+} from "./api";
+import {
+  armImageFallbacks,
+  closeDossier,
+  escapeHtml,
+  openDossier,
+  thumb,
+} from "./dossier";
 
 (window as unknown as { Buffer?: typeof Buffer }).Buffer ??= Buffer;
 
-const RPC = "https://api.cookiescan.io/";
-const CHAIN_RPC = "https://rpc.cookiescan.io/";
-const connection = new Connection(CHAIN_RPC, "confirmed");
-
-interface DasAsset {
-  id: string;
-  interface: string;
-  mutable?: boolean;
-  content?: {
-    files?: { uri?: string; mime?: string }[];
-    links?: { image?: string; external_url?: string };
-    metadata?: {
-      name?: string;
-      symbol?: string;
-      description?: string;
-      attributes?: { trait_type?: string; value?: string }[];
-    };
-  };
-  ownership?: { owner?: string };
-  grouping?: { group_key?: string; group_value?: string }[];
-  royalty?: { percent?: number; basis_points?: number };
-  market_cap?: number;
-  volume_24h?: number;
-  price_change_24h?: number;
-  holder_count?: number;
-  token_info?: {
-    balance?: number;
-    decimals?: number;
-    price_info?: { total_price?: number; price_per_token?: number; currency?: string };
-  };
-  creators?: { address?: string; share?: number; verified?: boolean }[];
-  authorities?: { address?: string; scopes?: string[] }[];
-}
-
-async function rpc<T>(method: string, params: unknown): Promise<T> {
-  const res = await fetch(RPC, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = (await res.json()) as { result?: T; error?: { message?: string } };
-  if (body.error) throw new Error(body.error.message ?? "RPC error");
-  return body.result as T;
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-}
-
-const COOKIE_SVG = `<svg class="noimg" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="#f0b429"/><circle cx="12" cy="12" r="2.2" fill="#14100b"/><circle cx="20" cy="11" r="1.7" fill="#14100b"/><circle cx="17" cy="18" r="2.4" fill="#14100b"/><circle cx="11" cy="20" r="1.6" fill="#14100b"/></svg>`;
+const connection = chainConnectionForWrites();
 
 let gallery = false;
 let currentItems: DasAsset[] = [];
 let currentTotal: number | undefined;
-
-function fastGateway(url: string): string {
-  return url.replace("https://ipfs.io/ipfs/", "https://cloudflare-ipfs.com/ipfs/");
-}
-
-function thumb(a: DasAsset, size: "sm" | "lg"): string {
-  const raw = a.content?.links?.image ??
-    a.content?.files?.find((f) => (f.mime ?? "").startsWith("image"))?.uri;
-  if (raw) {
-    return `<img src="${escapeHtml(fastGateway(raw))}" data-raw="${escapeHtml(raw)}" alt="" loading="lazy" class="${size}" />`;
-  }
-  return COOKIE_SVG;
-}
-
-// Swaps a failed fast-gateway image back to its origin URL, then to the
-// cookie mark if the origin fails too. Delegated in capture phase.
-function armImageFallbacks(root: HTMLElement): void {
-  root.addEventListener("error", (e) => {
-    const t = e.target as HTMLElement;
-    if (t.tagName !== "IMG") return;
-    const img = t as HTMLImageElement;
-    const raw = img.dataset.raw;
-    if (raw && img.src !== raw) {
-      img.src = raw;
-    } else {
-      const span = document.createElement("span");
-      span.innerHTML = COOKIE_SVG;
-      img.replaceWith(span.firstElementChild ?? span);
-    }
-  }, true);
-}
 
 function fmtBalance(a: DasAsset): string {
   const t = a.token_info;
@@ -118,17 +51,50 @@ function assetCard(a: DasAsset, i: number): string {
   </article>`;
 }
 
-function portfolioBar(items: DasAsset[], total?: number): string {
+function isFungible(a: DasAsset): boolean {
+  return a.interface === "FungibleToken" || a.interface === "FungibleAsset";
+}
+
+function shortAmount(a: DasAsset): string {
+  const t = a.token_info;
+  if (!t || t.balance === undefined) return "—";
+  return (t.balance / Math.pow(10, t.decimals ?? 0)).toLocaleString();
+}
+
+function changeBadge(a: DasAsset): string {
+  const chg = a.price_change_24h;
+  if (chg === undefined) return "—";
+  return `<span class="${chg >= 0 ? "up" : "down"}">${chg >= 0 ? "▲" : "▼"} ${Math.abs(chg).toFixed(1)}%</span>`;
+}
+
+function mcapCell(a: DasAsset): string {
+  if (a.market_cap === undefined) return "—";
+  return `$${a.market_cap.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
+
+function portfolioLine(items: DasAsset[], total?: number): string {
   let value = 0;
   let nfts = 0;
-  let fungibles = 0;
   for (const a of items) {
-    if (a.interface === "FungibleToken" || a.interface === "FungibleAsset") fungibles++;
-    else nfts++;
+    if (isFungible(a)) continue;
+    nfts++;
     value += a.token_info?.price_info?.total_price ?? 0;
   }
   const shown = total !== undefined ? `${total} on-chain` : `${items.length} shown`;
-  return `<div class="portfolio"><div><span class="hero">$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span><span class="hero-label">priced value</span></div><div class="pstats">${nfts} NFTs · ${fungibles} fungibles · ${shown}</div></div>`;
+  return `<p class="statline"><span class="hero">$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span> priced · ${nfts} NFTs · ${items.length - nfts} fungibles · ${shown}</p>`;
+}
+
+function assetRow(a: DasAsset, i: number): string {
+  const name = a.content?.metadata?.name ?? a.id;
+  const symbol = a.content?.metadata?.symbol ?? "";
+  const verified = (a.creators ?? []).some((c) => c.verified) ? " ✓" : "";
+  return `<tr data-i="${i}" tabindex="0">
+    <td><span class="cellasset">${thumb(a, "sm")}<span><strong>${escapeHtml(name)}${verified}</strong> <code>${escapeHtml(symbol)}</code></span></span></td>
+    <td>${isFungible(a) ? "FT" : "NFT"}</td>
+    <td class="num">${shortAmount(a)}</td>
+    <td class="num">${changeBadge(a)}</td>
+    <td class="num">${mcapCell(a)}</td>
+  </tr>`;
 }
 
 function render(items: DasAsset[], total?: number): void {
@@ -139,77 +105,37 @@ function render(items: DasAsset[], total?: number): void {
     const c = a.grouping?.find((g) => g.group_key === "collection")?.group_value ?? "ungrouped";
     collections.set(c, (collections.get(c) ?? 0) + 1);
   }
-  const chips = [...collections.entries()]
-    .map(([c, n]) => `<button class="chip" data-collection="${escapeHtml(c)}">${escapeHtml(c.slice(0, 14))}… ×${n}</button>`)
-    .join("");
-  resultsEl.innerHTML = portfolioBar(items, total) +
-    (chips ? `<div class="chips">${chips}</div>` : "") +
-    `<div class="${gallery ? "gallery" : "list"}">` + (items.map(assetCard).join("") || "<p>No assets found.</p>") + `</div>`;
-  resultsEl.querySelectorAll("article[data-i]").forEach((el) => {
-    const open = (): void => openDossier(currentItems[Number((el as HTMLElement).dataset.i)]);
+  const realCollections = [...collections.entries()].filter(([c]) => c !== "ungrouped");
+  const filter = realCollections.length
+    ? `<label class="collfilter">Collection <select id="collsel"><option value="">All (${items.length})</option>` +
+      realCollections.map(([c, n]) => `<option value="${escapeHtml(c)}">${escapeHtml(c.slice(0, 20))} (${n})</option>`).join("") +
+      `</select></label>`
+    : "";
+  const body = gallery
+    ? `<div class="gallery">` + (items.map(assetCard).join("") || "<p>No assets found.</p>") + `</div>`
+    : `<div class="tablewrap"><table><thead><tr><th>Asset</th><th>Type</th><th class="num">Balance</th><th class="num">24h</th><th class="num">Mcap</th></tr></thead>` +
+      `<tbody>` + (items.map(assetRow).join("") || `<tr><td colspan="5">No assets found.</td></tr>`) + `</tbody></table></div>`;
+  resultsEl.innerHTML = portfolioLine(items, total) + filter + body;
+  const sel = document.getElementById("collsel") as HTMLSelectElement | null;
+  sel?.addEventListener("change", () => {
+    if (sel.value) drillCollection(sel.value).catch(fail);
+  });
+  resultsEl.querySelectorAll("[data-i]").forEach((el) => {
+    const open = (): void => openDossier(currentItems[Number((el as HTMLElement).dataset.i)], {
+      onInspect: (owner: string) => {
+        addrInput.value = owner;
+        inspectCurrent().catch(fail);
+      },
+    });
     el.addEventListener("click", open);
     el.addEventListener("keydown", (e) => {
       if ((e as KeyboardEvent).key === "Enter") open();
     });
   });
-  resultsEl.querySelectorAll("[data-collection]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const c = (b as HTMLElement).dataset.collection!;
-      if (c !== "ungrouped") drillCollection(c).catch(fail);
-    }),
-  );
-}
-
-function openDossier(a: DasAsset): void {
-  const md = a.content?.metadata;
-  const attrs = (md?.attributes ?? [])
-    .map((t) => `<li><span>${escapeHtml(t.trait_type ?? "?")}</span><strong>${escapeHtml(t.value ?? "?")}</strong></li>`)
-    .join("");
-  const creators = (a.creators ?? [])
-    .map((c) => `<li><code>${escapeHtml(c.address ?? "?")}</code> ${c.share ?? 0}%${c.verified ? " ✓" : ""}</li>`)
-    .join("");
-  const files = (a.content?.files ?? [])
-    .map((f) => `<li><a href="${escapeHtml(f.uri ?? "#")}">${escapeHtml(f.mime ?? "file")}</a></li>`)
-    .join("");
-  modalEl.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="Asset dossier">
-    <button class="close" aria-label="Close">✕</button>
-    ${thumb(a, "lg")}
-    <h2>${escapeHtml(md?.name ?? a.id)}</h2>
-    ${md?.description ? `<p>${escapeHtml(md.description)}</p>` : ""}
-    <dl>
-      <div><dt>Mint</dt><dd><code>${escapeHtml(a.id)}</code> <button data-copy="${escapeHtml(a.id)}">copy</button></dd></div>
-      <div><dt>Owner</dt><dd><code>${escapeHtml(a.ownership?.owner ?? "—")}</code>${a.ownership?.owner ? ` <button data-inspect="${escapeHtml(a.ownership.owner)}">inspect →</button>` : ""}</dd></div>
-      <div><dt>Interface</dt><dd>${escapeHtml(a.interface)}${a.mutable === false ? " · immutable" : ""}</dd></div>
-      <div><dt>Royalty</dt><dd>${a.royalty?.percent ?? (a.royalty?.basis_points ?? 0) / 100}%</dd></div>
-    </dl>
-    ${attrs ? `<h3>Attributes</h3><ul class="attrs">${attrs}</ul>` : ""}
-    ${creators ? `<h3>Creators</h3><ul>${creators}</ul>` : ""}
-    ${files ? `<h3>Files</h3><ul>${files}</ul>` : ""}
-  </div>`;
-  modalEl.hidden = false;
-  modalEl.querySelector(".close")!.addEventListener("click", closeDossier);
-  modalEl.querySelectorAll("[data-copy]").forEach((b) =>
-    b.addEventListener("click", () => navigator.clipboard?.writeText((b as HTMLElement).dataset.copy!)),
-  );
-  modalEl.querySelectorAll("[data-inspect]").forEach((b) =>
-    b.addEventListener("click", () => {
-      closeDossier();
-      addrInput.value = (b as HTMLElement).dataset.inspect!;
-      inspectCurrent().catch(fail);
-    }),
-  );
-  modalEl.addEventListener("click", (e) => {
-    if (e.target === modalEl) closeDossier();
-  }, { once: true });
-}
-
-function closeDossier(): void {
-  modalEl.hidden = true;
-  modalEl.innerHTML = "";
 }
 
 function skeleton(): void {
-  resultsEl.innerHTML = `<div class="list">` + "<article class='skel'><div></div><div></div></article>".repeat(4) + `</div>`;
+  resultsEl.innerHTML = `<div class="skel"></div>`.repeat(3);
 }
 
 function fail(err: unknown): void {
@@ -219,12 +145,7 @@ function fail(err: unknown): void {
 async function showOwner(owner: string): Promise<void> {
   skeleton();
   setStatus(`Loading assets for ${owner}…`);
-  const data = await rpc<{ items: DasAsset[]; total: number }>("getAssetsByOwner", {
-    ownerAddress: owner,
-    page: 1,
-    limit: 50,
-    options: { showFungible: true, showCollectionMetadata: true },
-  });
+  const data = await getAssetsByOwner(owner);
   location.hash = `#/owner/${owner}`;
   setStatus(`Done — live from Cookie Chain.`);
   render(data.items, data.total);
@@ -233,7 +154,7 @@ async function showOwner(owner: string): Promise<void> {
 async function showActivity(): Promise<void> {
   skeleton();
   setStatus("Loading latest on-chain activity…");
-  const data = await rpc<{ items: DasAsset[] }>("searchAssets", {
+  const data = await searchAssets({
     page: 1,
     limit: 24,
     sortBy: { sortBy: "recent_action", sortDirection: "desc" },
@@ -246,7 +167,7 @@ async function showActivity(): Promise<void> {
 async function showMovers(): Promise<void> {
   skeleton();
   setStatus("Scanning chain volume…");
-  const data = await rpc<{ items: DasAsset[] }>("searchAssets", {
+  const data = await searchAssets({
     page: 1,
     limit: 100,
     options: { showCollectionMetadata: true },
@@ -264,7 +185,7 @@ async function showMovers(): Promise<void> {
 async function drillCollection(collection: string): Promise<void> {
   skeleton();
   setStatus(`Opening collection ${collection.slice(0, 12)}…`);
-  const data = await rpc<{ items: DasAsset[] }>("searchAssets", {
+  const data = await searchAssets({
     page: 1,
     limit: 50,
     grouping: ["collection", collection],
@@ -277,7 +198,7 @@ async function drillCollection(collection: string): Promise<void> {
 async function search(query: string): Promise<void> {
   skeleton();
   setStatus(`Searching for “${query}”…`);
-  const data = await rpc<{ items: DasAsset[] }>("searchAssets", {
+  const data = await searchAssets({
     page: 1,
     limit: 50,
     options: { showCollectionMetadata: true },
@@ -375,17 +296,8 @@ function txStatus(msg: string): void {
 async function showChainStats(): Promise<void> {
   const el = document.getElementById("chainslot") as HTMLElement;
   try {
-    const [slot, samples, fees] = await Promise.all([
-      connection.getSlot(),
-      connection.getRecentPerformanceSamples(2),
-      connection.getRecentPrioritizationFees(),
-    ]);
-    const txs = samples.reduce((n, s) => n + s.numTransactions, 0);
-    const secs = samples.reduce((n, s) => n + s.samplePeriodSecs, 0);
-    const tps = secs > 0 ? Math.round(txs / secs) : 0;
-    const sorted = fees.map((f) => f.prioritizationFee).sort((a, b) => a - b);
-    const median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
-    el.textContent = `slot ${slot.toLocaleString()} · ${tps} TPS · ${(median / 1e9).toFixed(9)} SOL fee`;
+    const stats = await getChainStats();
+    el.textContent = `slot ${stats.slot.toLocaleString()} · ${stats.tps} TPS · ${stats.medianFeeSol.toFixed(9)} SOL fee`;
   } catch {
     el.textContent = "Cookie Chain · RPC unreachable";
   }
@@ -431,15 +343,28 @@ for (const name of ["nightly", "phantom", "solflare"] as const) {
   document.getElementById(`connect-${name}`)!.addEventListener("click", () => connectWallet(name).catch(fail));
 }
 document.getElementById("sendbtn")!.addEventListener("click", () => sendSol().catch(fail));
-document.getElementById("activity")!.addEventListener("click", () => showActivity().catch(fail));
-document.getElementById("movers")!.addEventListener("click", () => showMovers().catch(fail));
+function setTab(id: string): void {
+  for (const t of ["activity", "movers", "viewtoggle"]) {
+    document.getElementById(t)!.classList.toggle("active", t === id);
+  }
+}
+document.getElementById("activity")!.addEventListener("click", () => {
+  gallery = false;
+  setTab("activity");
+  showActivity().catch(fail);
+});
+document.getElementById("movers")!.addEventListener("click", () => {
+  gallery = false;
+  setTab("movers");
+  showMovers().catch(fail);
+});
 document.getElementById("searchbtn")!.addEventListener("click", () => {
   const v = (document.getElementById("q") as HTMLInputElement).value.trim();
   if (v) search(v).catch(fail);
 });
-document.getElementById("viewtoggle")!.addEventListener("click", (e) => {
+document.getElementById("viewtoggle")!.addEventListener("click", () => {
   gallery = !gallery;
-  (e.target as HTMLElement).textContent = gallery ? "List view" : "Gallery view";
+  setTab(gallery ? "viewtoggle" : "activity");
   render(currentItems, currentTotal);
 });
 document.getElementById("palgo")!.addEventListener("click", () => {

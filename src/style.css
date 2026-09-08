@@ -36,14 +36,27 @@ button:hover { filter: brightness(1.08); }
 button.ghost { background: transparent; border: 1px solid var(--line); color: var(--cream); font-weight: 600; }
 button.ghost:hover { border-color: var(--gold-deep); filter: none; }
 #status, #txstatus { color: var(--muted); min-height: 1.5em; }
-.portfolio { display: flex; align-items: baseline; gap: 1.4rem; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 1.1rem 1.3rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
-.hero { font-family: var(--display); font-size: 2.6rem; font-weight: 700; color: var(--gold); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.hero-label { color: var(--muted); margin-left: 0.5rem; font-size: 0.95rem; }
-.pstats { color: var(--muted); font-family: var(--mono); font-size: 0.85rem; }
-.total { font-weight: 700; }
-.chips { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
-.chip { background: var(--panel-2); border: 1px solid var(--line); color: var(--cream); border-radius: 999px; padding: 0.28rem 0.8rem; font-size: 0.85rem; font-family: var(--mono); cursor: pointer; }
-.chip:hover { border-color: var(--gold-deep); }
+.statline { margin: 1.1rem 0 0.4rem; color: var(--muted); font-family: var(--mono); font-size: 0.88rem; }
+.hero { font-family: var(--display); font-size: 1.6rem; font-weight: 700; color: var(--gold); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin-right: 0.6rem; }
+.collfilter { display: inline-block; color: var(--muted); font-size: 0.88rem; margin-bottom: 0.5rem; }
+.collfilter select { background: var(--panel); color: var(--cream); border: 1px solid var(--line); border-radius: 8px; padding: 0.3rem 0.5rem; font-size: 0.88rem; margin-left: 0.4rem; }
+.tablewrap { overflow-x: auto; border-top: 2px solid var(--line); }
+table { width: 100%; border-collapse: collapse; font-size: 0.94rem; min-width: 560px; }
+th { font-family: var(--mono); font-size: 0.72rem; font-weight: 600; color: var(--faint); text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line); }
+td { padding: 0.6rem 0.7rem; border-bottom: 1px solid #241b0d; vertical-align: middle; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: #1a1409; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.cellasset { display: flex; align-items: center; gap: 0.7rem; }
+.cellasset img, .cellasset .noimg { width: 34px; height: 34px; border-radius: 8px; }
+.toolbar { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin: 0.2rem 0 0.4rem; }
+.wallets { color: var(--faint); font-size: 0.9rem; }
+.wlink { background: none; border: 0; padding: 0; color: var(--gold); font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+.wlink:hover { text-decoration: underline; filter: none; }
+.views { display: flex; gap: 1.1rem; }
+.tab { background: none; border: 0; padding: 0.2rem 0; color: var(--muted); font-size: 0.95rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; border-radius: 0; }
+.tab:hover { color: var(--cream); filter: none; }
+.tab.active { color: var(--gold); border-bottom-color: var(--gold); }
 article { display: flex; gap: 1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 0.85rem; margin: 0.6rem 0; cursor: pointer; animation: rise 0.45s cubic-bezier(0.2, 0.9, 0.25, 1) both; }
 article:hover { border-color: var(--gold-deep); transform: translateY(-1px); }
 article:nth-child(2) { animation-delay: 0.04s; } article:nth-child(3) { animation-delay: 0.08s; } article:nth-child(4) { animation-delay: 0.12s; }
@@ -85,7 +98,7 @@ small.addr { font-family: var(--mono); font-size: 0.75rem; }
 .attrs li { background: var(--panel-2); border-radius: 8px; padding: 0.45rem 0.65rem; display: flex; justify-content: space-between; font-size: 0.88rem; }
 .palbox { background: var(--panel); border: 1px solid var(--gold-deep); border-radius: 14px; padding: 1rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; max-width: 520px; width: 100%; }
 .palbox small { width: 100%; }
-.skel { min-height: 100px; border-color: transparent; animation: pulse 1.4s ease-in-out infinite; }
+.skel { min-height: 56px; background: var(--panel); border-radius: 8px; margin: 0.4rem 0; animation: pulse 1.4s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; }

@@ -16,13 +16,19 @@
       <form id="lookup">
         <input id="addr" type="text" spellcheck="false" placeholder="Paste a Cookie Chain wallet address…" />
         <button type="submit">Inspect</button>
-        <button type="button" id="connect-nightly">Nightly</button>
-        <button type="button" id="connect-phantom">Phantom</button>
-        <button type="button" id="connect-solflare">Solflare</button>
-        <button type="button" id="activity" class="ghost">Latest activity</button>
-        <button type="button" id="viewtoggle" class="ghost">Gallery view</button>
-        <button type="button" id="movers" class="ghost">Movers</button>
       </form>
+      <div class="toolbar">
+        <span class="wallets">Connect
+          <button type="button" class="wlink" id="connect-nightly">Nightly</button> ·
+          <button type="button" class="wlink" id="connect-phantom">Phantom</button> ·
+          <button type="button" class="wlink" id="connect-solflare">Solflare</button>
+        </span>
+        <nav class="views" aria-label="Views">
+          <button type="button" class="tab active" id="activity">Latest</button>
+          <button type="button" class="tab" id="movers">Movers</button>
+          <button type="button" class="tab" id="viewtoggle">Gallery</button>
+        </nav>
+      </div>
       <form id="searchform" onsubmit="return false">
         <input id="q" type="text" spellcheck="false" placeholder="Filter by name, mint, or creator…" />
         <button type="button" id="searchbtn">Search</button>
