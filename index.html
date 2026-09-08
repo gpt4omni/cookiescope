@@ -15,6 +15,8 @@
         <button type="submit">Inspect</button>
         <button type="button" id="connect">Connect wallet</button>
         <button type="button" id="activity">Latest activity</button>
+        <button type="button" id="viewtoggle">Gallery view</button>
+        <button type="button" id="movers">Movers</button>
       </form>
       <form id="searchform" onsubmit="return false">
         <input id="q" type="text" spellcheck="false" placeholder="Filter by name, mint, or creator…" />
@@ -22,6 +24,14 @@
       </form>
       <p id="status"></p>
       <section id="results"></section>
+      <div id="modal" hidden></div>
+      <div id="palette" hidden>
+        <div class="palbox" role="dialog" aria-modal="true" aria-label="Quick jump">
+          <input id="paladdr" type="text" spellcheck="false" placeholder="Jump to wallet… (empty = latest activity)" />
+          <button id="palgo">Go</button>
+          <small>⌘K / Ctrl-K toggles · Esc closes</small>
+        </div>
+      </div>
       <footer>Read-only · DAS JSON-RPC · no keys needed · <a href="https://github.com/gpt4omni/cookiescope">source</a></footer>
     </main>
     <script type="module" src="/src/main.ts"></script>
