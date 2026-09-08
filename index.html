@@ -13,7 +13,9 @@
       <form id="lookup">
         <input id="addr" type="text" spellcheck="false" placeholder="Paste a Cookie Chain wallet address…" />
         <button type="submit">Inspect</button>
-        <button type="button" id="connect">Connect wallet</button>
+        <button type="button" id="connect-nightly">Nightly</button>
+        <button type="button" id="connect-phantom">Phantom</button>
+        <button type="button" id="connect-solflare">Solflare</button>
         <button type="button" id="activity">Latest activity</button>
         <button type="button" id="viewtoggle">Gallery view</button>
         <button type="button" id="movers">Movers</button>
@@ -22,6 +24,20 @@
         <input id="q" type="text" spellcheck="false" placeholder="Filter by name, mint, or creator…" />
         <button type="button" id="searchbtn">Search</button>
       </form>
+      <p id="chainslot">Cookie Chain · connecting…</p>
+      <div id="walletbar" hidden>
+        <span>Connected <strong id="walletaddr"></strong> · <span id="walletbal"></span></span>
+      </div>
+      <section id="transact" aria-label="Send SOL on Cookie Chain">
+        <h2>Transact</h2>
+        <div class="txrow">
+          <input id="sendto" type="text" spellcheck="false" placeholder="Connect a wallet first…" />
+          <input id="sendamount" type="number" min="0" step="0.0001" placeholder="SOL" />
+          <button id="sendbtn">Send</button>
+        </div>
+        <p id="txstatus">Real transfer on Cookie Chain — wallet signs, chain confirms.</p>
+        <p id="txsig"></p>
+      </section>
       <p id="status"></p>
       <section id="results"></section>
       <div id="modal" hidden></div>

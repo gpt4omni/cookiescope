@@ -1,4 +1,11 @@
+import { Buffer } from "buffer";
+import { Connection, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+
+(window as unknown as { Buffer?: typeof Buffer }).Buffer ??= Buffer;
+
 const RPC = "https://api.cookiescan.io/";
+const CHAIN_RPC = "https://rpc.cookiescan.io/";
+const connection = new Connection(CHAIN_RPC, "confirmed");
 
 interface DasAsset {
   id: string;
@@ -52,10 +59,35 @@ let gallery = false;
 let currentItems: DasAsset[] = [];
 let currentTotal: number | undefined;
 
+function fastGateway(url: string): string {
+  return url.replace("https://ipfs.io/ipfs/", "https://cloudflare-ipfs.com/ipfs/");
+}
+
 function thumb(a: DasAsset, size: "sm" | "lg"): string {
-  const img = a.content?.links?.image;
-  if (img) return `<img src="${escapeHtml(img)}" alt="" loading="lazy" class="${size}" />`;
+  const raw = a.content?.links?.image ??
+    a.content?.files?.find((f) => (f.mime ?? "").startsWith("image"))?.uri;
+  if (raw) {
+    return `<img src="${escapeHtml(fastGateway(raw))}" data-raw="${escapeHtml(raw)}" alt="" loading="lazy" class="${size}" />`;
+  }
   return COOKIE_SVG;
+}
+
+// Swaps a failed fast-gateway image back to its origin URL, then to the
+// cookie mark if the origin fails too. Delegated in capture phase.
+function armImageFallbacks(root: HTMLElement): void {
+  root.addEventListener("error", (e) => {
+    const t = e.target as HTMLElement;
+    if (t.tagName !== "IMG") return;
+    const img = t as HTMLImageElement;
+    const raw = img.dataset.raw;
+    if (raw && img.src !== raw) {
+      img.src = raw;
+    } else {
+      const span = document.createElement("span");
+      span.innerHTML = COOKIE_SVG;
+      img.replaceWith(span.firstElementChild ?? span);
+    }
+  }, true);
 }
 
 function fmtBalance(a: DasAsset): string {
@@ -254,16 +286,97 @@ async function search(query: string): Promise<void> {
   ));
 }
 
-async function connectWallet(): Promise<void> {
-  const provider = (window as unknown as { solana?: { connect(): Promise<{ publicKey: { toString(): string } }> } }).solana;
+interface WalletProvider {
+  publicKey?: { toString(): string };
+  connect(): Promise<{ publicKey: { toString(): string } }>;
+  signTransaction<T>(tx: T): Promise<T>;
+}
+
+function getProvider(name: "nightly" | "phantom" | "solflare"): WalletProvider | null {
+  const w = window as unknown as {
+    nightly?: { solana?: WalletProvider };
+    solana?: WalletProvider & { isPhantom?: boolean };
+    solflare?: WalletProvider;
+  };
+  if (name === "nightly") return w.nightly?.solana ?? null;
+  if (name === "solflare") return w.solflare ?? null;
+  return w.solana ?? null;
+}
+
+let activeProvider: WalletProvider | null = null;
+let activeAddress = "";
+
+async function connectWallet(name: "nightly" | "phantom" | "solflare"): Promise<void> {
+  const provider = getProvider(name);
   if (!provider) {
-    setStatus("No Solana wallet detected — install Phantom, or paste an address above.");
+    setStatus(`No ${name} wallet detected — install it, or paste an address above for read-only mode.`);
     return;
   }
-  setStatus("Waiting for wallet approval…");
+  setStatus(`Waiting for ${name} approval…`);
   const { publicKey } = await provider.connect();
-  addrInput.value = publicKey.toString();
+  activeProvider = provider;
+  activeAddress = publicKey.toString();
+  const lamports = await connection.getBalance(new PublicKey(activeAddress));
+  addrInput.value = activeAddress;
+  walletEl.hidden = false;
+  walletAddrEl.textContent = `${activeAddress.slice(0, 6)}…${activeAddress.slice(-4)}`;
+  walletBalEl.textContent = `${(lamports / LAMPORTS_PER_SOL).toFixed(4)} SOL`;
+  (document.getElementById("sendto") as HTMLInputElement).placeholder = "Recipient address…";
+  setStatus(`Connected with ${name}.`);
   await inspectCurrent();
+}
+
+async function sendSol(): Promise<void> {
+  if (!activeProvider?.publicKey) {
+    txStatus("Connect a wallet first (Nightly required for the bounty demo).");
+    return;
+  }
+  const to = (document.getElementById("sendto") as HTMLInputElement).value.trim();
+  const amount = Number((document.getElementById("sendamount") as HTMLInputElement).value);
+  if (!to || !(amount > 0)) {
+    txStatus("Enter a recipient address and an amount above zero.");
+    return;
+  }
+  const sendBtn = document.getElementById("sendbtn") as HTMLButtonElement;
+  sendBtn.disabled = true;
+  try {
+    txStatus("Building transaction…");
+    const tx = new Transaction().add(SystemProgram.transfer({
+      fromPubkey: new PublicKey(activeAddress),
+      toPubkey: new PublicKey(to),
+      lamports: Math.round(amount * LAMPORTS_PER_SOL),
+    }));
+    tx.feePayer = new PublicKey(activeAddress);
+    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    txStatus("Waiting for wallet signature…");
+    const signed = await activeProvider.signTransaction(tx);
+    txStatus("Broadcasting…");
+    const sig = await connection.sendRawTransaction(signed.serialize());
+    txStatus(`Confirming ${sig.slice(0, 12)}…`);
+    await connection.confirmTransaction(sig, "confirmed");
+    txStatus(`Confirmed ✓ ${sig}`);
+    const sigEl = document.getElementById("txsig") as HTMLElement;
+    sigEl.innerHTML = `signature: <code>${escapeHtml(sig)}</code> <button id="sigcopy">copy</button>`;
+    document.getElementById("sigcopy")!.addEventListener("click", () => navigator.clipboard?.writeText(sig));
+  } catch (err: unknown) {
+    txStatus(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+  } finally {
+    sendBtn.disabled = false;
+  }
+}
+
+function txStatus(msg: string): void {
+  (document.getElementById("txstatus") as HTMLElement).textContent = msg;
+}
+
+async function showSlot(): Promise<void> {
+  try {
+    const slot = await connection.getSlot();
+    (document.getElementById("chainslot") as HTMLElement).textContent =
+      `Cookie Chain · slot ${slot.toLocaleString()} · live`;
+  } catch {
+    (document.getElementById("chainslot") as HTMLElement).textContent = "Cookie Chain · RPC unreachable";
+  }
 }
 
 async function inspectCurrent(): Promise<void> {
@@ -289,12 +402,22 @@ const resultsEl = document.getElementById("results") as HTMLElement;
 const modalEl = document.getElementById("modal") as HTMLElement;
 const paletteEl = document.getElementById("palette") as HTMLElement;
 const addrInput = document.getElementById("addr") as HTMLInputElement;
+const walletEl = document.getElementById("walletbar") as HTMLElement;
+const walletAddrEl = document.getElementById("walletaddr") as HTMLElement;
+const walletBalEl = document.getElementById("walletbal") as HTMLElement;
+
+armImageFallbacks(resultsEl);
+armImageFallbacks(modalEl);
+void showSlot();
 
 document.getElementById("lookup")!.addEventListener("submit", (e) => {
   e.preventDefault();
   inspectCurrent().catch(fail);
 });
-document.getElementById("connect")!.addEventListener("click", () => connectWallet().catch(fail));
+for (const name of ["nightly", "phantom", "solflare"] as const) {
+  document.getElementById(`connect-${name}`)!.addEventListener("click", () => connectWallet(name).catch(fail));
+}
+document.getElementById("sendbtn")!.addEventListener("click", () => sendSol().catch(fail));
 document.getElementById("activity")!.addEventListener("click", () => showActivity().catch(fail));
 document.getElementById("movers")!.addEventListener("click", () => showMovers().catch(fail));
 document.getElementById("searchbtn")!.addEventListener("click", () => {
